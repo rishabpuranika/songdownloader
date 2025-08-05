@@ -1,4 +1,6 @@
 flask
 yt_dlp
 flask_socketio
-ffmpeg
+ffmpeg-python
+gunicorn
+eventlet
