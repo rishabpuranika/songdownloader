@@ -13,6 +13,7 @@
             justify-content: center;
             align-items: center;
             padding: 20px;
+            box-sizing: border-box;
         }
         
         .container {
@@ -50,12 +51,17 @@
             outline: none;
         }
         
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            align-items: center;
+        }
+
         .format-buttons {
             display: flex;
+            flex-direction: column;
             gap: 10px;
-            margin-bottom: 1.5rem;
-            justify-content: center;
-            flex-wrap: wrap;
         }
         
         button {
@@ -66,7 +72,6 @@
             font-size: 16px;
             font-weight: 600;
             transition: all 0.2s;
-            min-width: 140px;
             color: white;
         }
         
@@ -75,10 +80,31 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             opacity: 0.9;
         }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
         
         .mp3-btn { background-color: #4CAF50; }
         .mp4-btn { background-color: #2196F3; }
         .wav-btn { background-color: #9C27B0; }
+        
+        .mp4-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #quality {
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+            background-color: white;
+        }
         
         .progress-container {
             display: none;
@@ -124,7 +150,7 @@
         
         .detail-item {
             display: grid;
-            grid-template-columns: 120px 1fr;
+            grid-template-columns: 100px 1fr;
             gap: 1rem;
             padding: 12px;
             background: white;
@@ -145,16 +171,24 @@
             white-space: nowrap;
         }
         
-        .complete-message {
-            display: none;
+        #statusMessage {
             text-align: center;
-            color: #4CAF50;
             font-weight: 600;
             margin-top: 1rem;
             padding: 12px;
-            background: #e8f5e9;
             border-radius: 6px;
             animation: fadeIn 0.5s ease-in;
+            display: none;
+        }
+
+        .status-complete {
+            color: #4CAF50;
+            background: #e8f5e9;
+        }
+
+        .status-error {
+            color: #f44336;
+            background: #ffebee;
         }
         
         @keyframes fadeIn {
@@ -164,8 +198,7 @@
 
         @media (max-width: 600px) {
             .container { padding: 1rem; }
-            .format-buttons { flex-direction: column; }
-            button { width: 100%; }
+            .controls-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -175,18 +208,24 @@
         <div class="input-group">
             <input type="text" id="url" placeholder="Enter YouTube URL">
         </div>
-        <div class="format-buttons">
-            <button class="mp3-btn" onclick="download('mp3')">Download MP3</button>
-            <button class="wav-btn" onclick="download('wav')">Download WAV</button>
-            <select id="quality" style="min-width:140px;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;">
-                <option value="1080p">1080p</option>
-                <option value="720p">720p</option>
-                <option value="480p">480p</option>
-                <option value="360p">360p</option>
-                <option value="best">Best Available</option>
-            </select>
-            <button class="mp4-btn" onclick="download('mp4')">Download MP4</button>
+
+        <div class="controls-grid">
+            <div class="format-buttons">
+                <button class="mp3-btn" onclick="startDownload('mp3')">Download MP3</button>
+                <button class="wav-btn" onclick="startDownload('wav')">Download WAV</button>
+            </div>
+            <div class="mp4-options">
+                 <select id="quality">
+                    <option value="best">Best Available</option>
+                    <option value="1080p">1080p</option>
+                    <option value="720p">720p</option>
+                    <option value="480p">480p</option>
+                    <option value="360p">360p</option>
+                </select>
+                <button class="mp4-btn" onclick="startDownload('mp4')">Download MP4</button>
+            </div>
         </div>
+
         <div class="progress-container" id="progressContainer">
             <div class="progress-bar">
                 <div class="progress-text" id="progressText">0%</div>
@@ -201,26 +240,23 @@
                     <span class="detail-label">ETA</span>
                     <span class="detail-value" id="etaText">-</span>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Location</span>
-                    <span class="detail-value" id="locationText">-</span>
-                </div>
             </div>
-            <div class="complete-message" id="completeMessage">
-                Download Complete! ✓
-            </div>
+            <div id="statusMessage"></div>
         </div>
     </div>
 
     <script>
         const socket = io();
         
+        function setButtonsDisabled(disabled) {
+            document.querySelectorAll('button').forEach(button => {
+                button.disabled = disabled;
+            });
+        }
+
         function cleanText(text) {
-            return text
-                .replace(/\[\d+(?:;\d+)*m/g, '')
-                .replace(/\[.*?\]/g, '')
-                .replace(/□/g, '')
-                .trim();
+            // Removes ANSI color codes and other junk from yt-dlp output
+            return text.replace(/\[\d+(?:;\d+)*m/g, '').trim();
         }
 
         function parseProgress(progress) {
@@ -228,7 +264,7 @@
             return match ? parseFloat(match[1]) : 0;
         }
         
-        function download(format) {
+        function startDownload(format) {
             const url = document.getElementById('url').value;
             if (!url) {
                 alert('Please enter a YouTube URL');
@@ -236,15 +272,20 @@
             }
             const quality = document.getElementById('quality').value;
 
+            // Show progress and disable buttons
             const progressContainer = document.getElementById('progressContainer');
             progressContainer.style.display = 'block';
-            // Reset all fields
+            setButtonsDisabled(true);
+
+            // Reset UI
             document.getElementById('progressBar').style.width = '0%';
-            document.getElementById('progressText').textContent = '0%';
+            document.getElementById('progressText').textContent = 'Starting...';
             document.getElementById('speedText').textContent = '-';
             document.getElementById('etaText').textContent = '-';
-            document.getElementById('locationText').textContent = '-';
-            document.getElementById('completeMessage').style.display = 'none';
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.style.display = 'none';
+            statusMessage.className = '';
+
 
             fetch('/download', {
                 method: 'POST',
@@ -267,22 +308,35 @@
             
             document.getElementById('speedText').textContent = cleanText(data.speed);
             document.getElementById('etaText').textContent = cleanText(data.eta);
-            
-            if (data.filename) {
-                const filename = data.filename.replace(/^.*[\\\/]/, '').split("'")[0];
-                document.getElementById('locationText').textContent = filename;
-            }
         });
 
+        // --- IMPORTANT CHANGE ---
         socket.on('download_complete', function(data) {
+            // Update UI to 100%
             document.getElementById('progressBar').style.width = '100%';
             document.getElementById('progressText').textContent = '100%';
-            document.getElementById('locationText').textContent = data.file_path;
-            document.getElementById('completeMessage').style.display = 'block';
+            
+            // Show success message
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = 'Download ready! Starting download to your device...';
+            statusMessage.className = 'status-complete';
+            statusMessage.style.display = 'block';
+
+            // Re-enable buttons
+            setButtonsDisabled(false);
+
+            // Trigger the actual file download to the user's browser!
+            window.location.href = `/download_file/${data.filename}`;
         });
 
         socket.on('download_error', function(data) {
-            alert('Download error: ' + data.error);
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = 'Error: ' + data.error;
+            statusMessage.className = 'status-error';
+            statusMessage.style.display = 'block';
+            
+            // Re-enable buttons on error
+            setButtonsDisabled(false);
         });
     </script>
 </body>
