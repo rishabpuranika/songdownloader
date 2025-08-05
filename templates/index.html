@@ -177,8 +177,15 @@
         </div>
         <div class="format-buttons">
             <button class="mp3-btn" onclick="download('mp3')">Download MP3</button>
-            <button class="mp4-btn" onclick="download('mp4')">Download MP4</button>
             <button class="wav-btn" onclick="download('wav')">Download WAV</button>
+            <select id="quality" style="min-width:140px;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;">
+                <option value="1080p">1080p</option>
+                <option value="720p">720p</option>
+                <option value="480p">480p</option>
+                <option value="360p">360p</option>
+                <option value="best">Best Available</option>
+            </select>
+            <button class="mp4-btn" onclick="download('mp4')">Download MP4</button>
         </div>
         <div class="progress-container" id="progressContainer">
             <div class="progress-bar">
@@ -227,10 +234,10 @@
                 alert('Please enter a YouTube URL');
                 return;
             }
+            const quality = document.getElementById('quality').value;
 
             const progressContainer = document.getElementById('progressContainer');
             progressContainer.style.display = 'block';
-            
             // Reset all fields
             document.getElementById('progressBar').style.width = '0%';
             document.getElementById('progressText').textContent = '0%';
@@ -238,11 +245,11 @@
             document.getElementById('etaText').textContent = '-';
             document.getElementById('locationText').textContent = '-';
             document.getElementById('completeMessage').style.display = 'none';
-            
+
             fetch('/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, format })
+                body: JSON.stringify({ url, format, quality })
             });
         }
 

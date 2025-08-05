@@ -29,13 +29,14 @@ def index():
 def download():
     video_url = request.json.get('url')
     format_type = request.json.get('format')
-    
+    quality = request.json.get('quality', 'best')
+
     try:
         base_opts = {
             'outtmpl': os.path.join(OUTPUT_DIR, '%(title)s.%(ext)s'),
             'progress_hooks': [progress_hook],
         }
-        
+
         if format_type == 'mp3':
             ydl_opts = {
                 **base_opts,
@@ -47,9 +48,17 @@ def download():
                 }],
             }
         elif format_type == 'mp4':
+            # Map quality to yt-dlp format string
+            quality_map = {
+                '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best',
+                '720p': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
+                '480p': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best',
+                '360p': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best',
+                'best': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            }
             ydl_opts = {
                 **base_opts,
-                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'format': quality_map.get(quality, quality_map['best']),
             }
         elif format_type == 'wav':
             ydl_opts = {
@@ -68,14 +77,14 @@ def download():
             extension = 'mp3' if format_type == 'mp3' else ('mp4' if format_type == 'mp4' else 'wav')
             filename = f"{info['title']}.{extension}"
             full_path = os.path.join(OUTPUT_DIR, filename)
-            
+
             socketio.emit('download_complete', {
                 'success': True,
                 'filename': filename,
                 'file_path': full_path
             })
             return jsonify({'success': True})
-            
+
     except Exception as e:
         socketio.emit('download_error', {'error': str(e)})
         return jsonify({'success': False, 'error': str(e)})
