@@ -1,0 +1,84 @@
+from flask import Flask, render_template, request, jsonify
+import os
+from yt_dlp import YoutubeDL
+from flask_socketio import SocketIO
+
+app = Flask(__name__)
+socketio = SocketIO(app)
+# Save to user's Downloads folder (cross-platform)
+OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def progress_hook(d):
+    if d['status'] == 'downloading':
+        progress = d.get('_percent_str', '0%')
+        speed = d.get('_speed_str', 'N/A')
+        eta = d.get('_eta_str', 'N/A')
+        socketio.emit('download_progress', {
+            'progress': progress,
+            'speed': speed,
+            'eta': eta,
+            'filename': d.get('filename', '')
+        })
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/download', methods=['POST'])
+def download():
+    video_url = request.json.get('url')
+    format_type = request.json.get('format')
+    
+    try:
+        base_opts = {
+            'outtmpl': os.path.join(OUTPUT_DIR, '%(title)s.%(ext)s'),
+            'progress_hooks': [progress_hook],
+        }
+        
+        if format_type == 'mp3':
+            ydl_opts = {
+                **base_opts,
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+            }
+        elif format_type == 'mp4':
+            ydl_opts = {
+                **base_opts,
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            }
+        elif format_type == 'wav':
+            ydl_opts = {
+                **base_opts,
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'wav',
+                }],
+            }
+        else:
+            return jsonify({'success': False, 'error': 'Invalid format'})
+
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=True)
+            extension = 'mp3' if format_type == 'mp3' else ('mp4' if format_type == 'mp4' else 'wav')
+            filename = f"{info['title']}.{extension}"
+            full_path = os.path.join(OUTPUT_DIR, filename)
+            
+            socketio.emit('download_complete', {
+                'success': True,
+                'filename': filename,
+                'file_path': full_path
+            })
+            return jsonify({'success': True})
+            
+    except Exception as e:
+        socketio.emit('download_error', {'error': str(e)})
+        return jsonify({'success': False, 'error': str(e)})
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True)
