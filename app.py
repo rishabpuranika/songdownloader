@@ -31,11 +31,16 @@ def download():
     format_type = request.json.get('format')
     quality = request.json.get('quality', 'best')
 
+    # Add cookies.txt support if present
+    cookies_path = os.path.join(os.path.dirname(__file__), 'cookies.txt')
+    base_opts = {
+        'outtmpl': os.path.join(OUTPUT_DIR, '%(title)s.%(ext)s'),
+        'progress_hooks': [progress_hook],
+    }
+    if os.path.exists(cookies_path):
+        base_opts['cookiefile'] = cookies_path
+
     try:
-        base_opts = {
-            'outtmpl': os.path.join(OUTPUT_DIR, '%(title)s.%(ext)s'),
-            'progress_hooks': [progress_hook],
-        }
 
         if format_type == 'mp3':
             ydl_opts = {
