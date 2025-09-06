@@ -279,19 +279,81 @@
 
             // Reset UI
             document.getElementById('progressBar').style.width = '0%';
-            document.getElementById('progressText').textContent = 'Starting...';
+            document.getElementById('progressText').textContent = 'Extracting download URL...';
             document.getElementById('speedText').textContent = '-';
             document.getElementById('etaText').textContent = '-';
             const statusMessage = document.getElementById('statusMessage');
             statusMessage.style.display = 'none';
             statusMessage.className = '';
 
+            // Try to get direct download URL first
+            fetch('/get_download_url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, format, quality })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.direct_url) {
+                        // Direct download for MP4
+                        document.getElementById('progressText').textContent = 'Starting direct download...';
+                        triggerDirectDownload(data.direct_url, data.filename);
+                    } else if (data.needs_processing) {
+                        // Need server-side processing for audio formats
+                        document.getElementById('progressText').textContent = 'Processing audio - please wait...';
+                        startServerDownload(url, format, quality);
+                    }
+                } else {
+                    showError('Failed to extract download URL: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError('Network error occurred');
+            });
+        }
 
+        function triggerDirectDownload(directUrl, filename) {
+            // Create a temporary link and trigger download
+            const link = document.createElement('a');
+            link.href = directUrl;
+            link.download = filename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Show success message
+            document.getElementById('progressBar').style.width = '100%';
+            document.getElementById('progressText').textContent = 'Download started!';
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = 'Download started in your browser!';
+            statusMessage.className = 'status-complete';
+            statusMessage.style.display = 'block';
+            
+            // Re-enable buttons
+            setTimeout(() => {
+                setButtonsDisabled(false);
+                document.getElementById('progressContainer').style.display = 'none';
+            }, 3000);
+        }
+
+        function startServerDownload(url, format, quality) {
+            // Fallback to server-side download for audio processing
             fetch('/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url, format, quality })
             });
+        }
+
+        function showError(message) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = 'Error: ' + message;
+            statusMessage.className = 'status-error';
+            statusMessage.style.display = 'block';
+            setButtonsDisabled(false);
         }
 
         socket.on('download_progress', function(data) {
