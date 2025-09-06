@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Client Download Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        input[type="text"] { 
+            width: 70%; 
+            padding: 10px; 
+            border: 2px solid #ddd; 
+            border-radius: 5px; 
+            margin-right: 10px; 
+        }
+        button { 
+            padding: 10px 20px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .status { 
+            margin-top: 20px; 
+            padding: 15px; 
+            border-radius: 5px; 
+            display: none; 
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .flow { background: #e2e3e5; padding: 15px; border-left: 4px solid #6c757d; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 YouTube Client Download Test</h1>
+        
+        <div class="flow">
+            <h3>How it Works:</h3>
+            <p><strong>1.</strong> Enter YouTube URL</p>
+            <p><strong>2.</strong> Click "Test Download" - extracts direct download URL</p>
+            <p><strong>3.</strong> Browser downloads file directly to your device</p>
+            <p><strong>4.</strong> No files stored on server! 🎯</p>
+        </div>
+        
+        <div>
+            <input type="text" id="urlInput" placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ)" 
+                   value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+            <button onclick="testDownload()" id="downloadBtn">Test Download</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        async function testDownload() {
+            const url = document.getElementById('urlInput').value;
+            const statusDiv = document.getElementById('status');
+            const btn = document.getElementById('downloadBtn');
+            
+            if (!url) {
+                showStatus('Please enter a YouTube URL', 'error');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            showStatus('Extracting direct download URL...', 'info');
+            
+            try {
+                // Step 1: Get direct download URL from server
+                const response = await fetch('/get_download_url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        url: url, 
+                        format: 'mp4', 
+                        quality: '360p' 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.direct_url) {
+                    // Step 2: Trigger direct download to client device
+                    showStatus(`✅ SUCCESS! Downloading "${data.title}" to your device...`, 'success');
+                    
+                    // Create temporary link and trigger download
+                    const link = document.createElement('a');
+                    link.href = data.direct_url;
+                    link.download = data.filename;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    setTimeout(() => {
+                        showStatus(`🎯 Download started! File: "${data.filename}"`, 'success');
+                    }, 1000);
+                    
+                } else if (data.needs_processing) {
+                    showStatus('🔄 This format needs server processing (would work for audio files)', 'info');
+                } else {
+                    showStatus('❌ Failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('❌ Connection error. Make sure the Flask app is running on port 5000', 'error');
+            }
+            
+            btn.disabled = false;
+            btn.textContent = 'Test Download';
+        }
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+        
+        // Test connection on page load
+        window.addEventListener('load', () => {
+            fetch('/get_download_url', { method: 'POST', body: '{}' })
+                .then(() => showStatus('✅ Connected to Flask app - ready to test!', 'success'))
+                .catch(() => showStatus('⚠️ Flask app not running. Start with: python3 app.py', 'info'));
+        });
+    </script>
+</body>
+</html>
