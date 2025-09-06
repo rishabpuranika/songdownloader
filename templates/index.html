@@ -11,25 +11,31 @@
             min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
-            padding: 20px;
+            align-items: flex-start;
+            padding: 10px;
             box-sizing: border-box;
+            /* Better mobile scrolling */
+            -webkit-overflow-scrolling: touch;
         }
         
         .container {
             background: rgba(255, 255, 255, 0.95);
-            padding: 2rem;
+            padding: 1.5rem;
             border-radius: 15px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            width: 90%;
+            width: 100%;
             max-width: 600px;
+            margin-top: 20px;
+            /* Better mobile handling */
+            backdrop-filter: blur(10px);
         }
         
         h1 {
             color: #333;
             text-align: center;
-            margin-bottom: 2rem;
-            font-size: 2.2rem;
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+            line-height: 1.2;
         }
         
         .input-group {
@@ -38,72 +44,103 @@
         
         input[type="text"] {
             width: 100%;
-            padding: 12px;
+            padding: 16px;
             border: 2px solid #ddd;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 16px;
             transition: border-color 0.3s;
             box-sizing: border-box;
+            /* Prevent zoom on mobile */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
         }
         
         input[type="text"]:focus {
             border-color: #6e8efb;
             outline: none;
+            box-shadow: 0 0 0 3px rgba(110, 142, 251, 0.2);
         }
         
         .controls-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            align-items: center;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            align-items: stretch;
         }
 
         .format-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 1rem;
         }
         
         button {
-            padding: 12px 24px;
+            padding: 16px 20px;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             cursor: pointer;
             font-size: 16px;
             font-weight: 600;
             transition: all 0.2s;
             color: white;
+            /* Better touch targets */
+            min-height: 48px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
         }
         
         button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             opacity: 0.9;
+        }
+        
+        button:active {
+            transform: translateY(0);
+            transition: all 0.1s;
         }
 
         button:disabled {
-            background-color: #ccc;
+            background-color: #ccc !important;
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
+            opacity: 0.6;
         }
         
         .mp3-btn { background-color: #4CAF50; }
-        .mp4-btn { background-color: #2196F3; }
+        .mp4-btn { 
+            background-color: #2196F3;
+            grid-column: 1 / -1; /* Full width on mobile */
+        }
         .wav-btn { background-color: #9C27B0; }
         
         .mp4-options {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
         #quality {
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
+            padding: 16px;
+            border-radius: 12px;
+            border: 2px solid #ddd;
             font-size: 16px;
             background-color: white;
+            min-height: 48px;
+            /* Prevent zoom on mobile */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            cursor: pointer;
+        }
+        
+        #quality:focus {
+            border-color: #6e8efb;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(110, 142, 251, 0.2);
         }
         
         .progress-container {
@@ -196,9 +233,99 @@
             to { opacity: 1; }
         }
 
-        @media (max-width: 600px) {
-            .container { padding: 1rem; }
-            .controls-grid { grid-template-columns: 1fr; }
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+                align-items: flex-start;
+            }
+            
+            .container { 
+                padding: 1rem;
+                margin-top: 10px;
+                border-radius: 12px;
+                max-width: none;
+            }
+            
+            h1 {
+                font-size: 1.6rem;
+                margin-bottom: 1rem;
+            }
+            
+            .controls-grid { 
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .format-buttons {
+                grid-template-columns: 1fr;
+                gap: 8px;
+                margin-bottom: 0.5rem;
+            }
+            
+            .mp4-btn {
+                grid-column: 1;
+            }
+            
+            button {
+                padding: 14px 16px;
+                font-size: 15px;
+                min-height: 44px;
+            }
+            
+            input[type="text"], #quality {
+                padding: 14px;
+                font-size: 16px; /* Prevent zoom */
+                border-radius: 10px;
+            }
+            
+            .detail-item {
+                grid-template-columns: 80px 1fr;
+                padding: 8px;
+                font-size: 13px;
+            }
+            
+            .progress-text {
+                font-size: 12px;
+            }
+        }
+        
+        /* Very small phones */
+        @media (max-width: 375px) {
+            .container {
+                padding: 0.75rem;
+            }
+            
+            h1 {
+                font-size: 1.4rem;
+            }
+            
+            button {
+                padding: 12px 14px;
+                font-size: 14px;
+                min-height: 42px;
+            }
+            
+            input[type="text"], #quality {
+                padding: 12px;
+            }
+        }
+        
+        /* Tablet landscape */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .container {
+                max-width: 700px;
+                padding: 2rem;
+            }
+            
+            .controls-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 2rem;
+            }
+            
+            .format-buttons {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -286,7 +413,7 @@
             statusMessage.style.display = 'none';
             statusMessage.className = '';
 
-            // Try to get direct download URL first
+            // Validate URL first, then start server download
             fetch('/get_download_url', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -295,17 +422,14 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    if (data.direct_url) {
-                        // Direct download for MP4
-                        document.getElementById('progressText').textContent = 'Starting direct download...';
-                        triggerDirectDownload(data.direct_url, data.filename);
-                    } else if (data.needs_processing) {
-                        // Need server-side processing for audio formats
-                        document.getElementById('progressText').textContent = 'Processing audio - please wait...';
+                    if (data.needs_processing) {
+                        // All formats now use server-side processing for direct downloads
+                        const formatText = format === 'mp3' ? 'audio' : format === 'wav' ? 'audio' : 'video';
+                        document.getElementById('progressText').textContent = `Processing ${formatText} - please wait...`;
                         startServerDownload(url, format, quality);
                     }
                 } else {
-                    showError('Failed to extract download URL: ' + data.error);
+                    showError('Failed to validate URL: ' + data.error);
                 }
             })
             .catch(error => {
@@ -314,33 +438,9 @@
             });
         }
 
-        function triggerDirectDownload(directUrl, filename) {
-            // Create a temporary link and trigger download
-            const link = document.createElement('a');
-            link.href = directUrl;
-            link.download = filename;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            // Show success message
-            document.getElementById('progressBar').style.width = '100%';
-            document.getElementById('progressText').textContent = 'Download started!';
-            const statusMessage = document.getElementById('statusMessage');
-            statusMessage.textContent = 'Download started in your browser!';
-            statusMessage.className = 'status-complete';
-            statusMessage.style.display = 'block';
-            
-            // Re-enable buttons
-            setTimeout(() => {
-                setButtonsDisabled(false);
-                document.getElementById('progressContainer').style.display = 'none';
-            }, 3000);
-        }
 
         function startServerDownload(url, format, quality) {
-            // Fallback to server-side download for audio processing
+            // Server-side download for all formats (ensures direct download without redirects)
             fetch('/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -372,7 +472,6 @@
             document.getElementById('etaText').textContent = cleanText(data.eta);
         });
 
-        // --- IMPORTANT CHANGE ---
         socket.on('download_complete', function(data) {
             // Update UI to 100%
             document.getElementById('progressBar').style.width = '100%';
@@ -387,8 +486,20 @@
             // Re-enable buttons
             setButtonsDisabled(false);
 
-            // Trigger the actual file download to the user's browser!
-            window.location.href = `/download_file/${data.filename}`;
+            // Trigger the actual file download directly to the user's device
+            // This creates a proper download without redirects or opening new tabs
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `/download_file/${data.filename}`;
+            downloadLink.download = data.filename;
+            downloadLink.style.display = 'none';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // Hide progress after a delay
+            setTimeout(() => {
+                document.getElementById('progressContainer').style.display = 'none';
+            }, 3000);
         });
 
         socket.on('download_error', function(data) {

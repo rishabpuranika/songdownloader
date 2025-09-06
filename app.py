@@ -61,7 +61,7 @@ def download_file(filename):
 
 @app.route('/get_download_url', methods=['POST'])
 def get_download_url():
-    """Extract direct download URL without downloading to server"""
+    """Extract video info and always use server processing for consistent direct downloads"""
     video_url = request.json.get('url')
     format_type = request.json.get('format')
     quality = request.json.get('quality', 'best')
@@ -79,182 +79,31 @@ def get_download_url():
         base_opts['cookiefile'] = cookies_path
 
     try:
-        # For URL extraction, don't specify format - get all available formats
-        # This prevents format availability errors
-        ydl_opts = base_opts.copy()  # Don't specify format selector
+        # Extract video info to validate URL and get title
+        ydl_opts = base_opts.copy()
         
-        # Store the requested format for later filtering
-        requested_format = format_type
-        requested_quality = quality
-
         with YoutubeDL(ydl_opts) as ydl:
-            logging.info(f"Extracting download URL for: {video_url}")
-            logging.info(f"Requested format: {requested_format}, quality: {requested_quality}")
+            logging.info(f"Extracting video info for: {video_url}")
+            logging.info(f"Requested format: {format_type}, quality: {quality}")
             
-            # Extract all available formats
-            info = ydl.extract_info(video_url, download=False)  # Don't download, just extract info
+            # Extract video info without downloading
+            info = ydl.extract_info(video_url, download=False)
             
             title = info.get('title', 'Unknown')
             logging.info(f"Successfully extracted info for: {title}")
             
-            # For MP4, we can provide direct URL
-            if requested_format == 'mp4':
-                direct_url = None
-                found_format = None
-                
-                # Try different ways to get the direct URL
-                if 'url' in info:
-                    direct_url = info['url']
-                    found_format = {'note': 'Direct URL from info'}
-                    logging.info("Found direct URL in main info")
-                elif 'entries' in info and info['entries']:
-                    # Handle playlists - take first entry
-                    logging.info("Processing playlist - taking first entry")
-                    first_entry = info['entries'][0]
-                    if 'url' in first_entry:
-                        direct_url = first_entry['url']
-                        found_format = {'note': 'Direct URL from playlist entry'}
-                    elif 'formats' in first_entry:
-                        formats = first_entry['formats']
-                        for fmt in formats:
-                            if fmt.get('ext') == 'mp4' and fmt.get('url'):
-                                direct_url = fmt['url']
-                                found_format = fmt
-                                break
-                elif 'formats' in info and info['formats']:
-                    formats = info['formats']
-                    logging.info(f"Found {len(formats)} formats to analyze")
-                    
-                    # Filter formats - prefer progressive downloads but allow HLS as fallback
-                    def is_progressive_format(fmt):
-                        # Progressive formats are preferred (direct downloads)
-                        if fmt.get('protocol') in ['https', 'http']:
-                            url = fmt.get('url', '')
-                            if not any(indicator in url.lower() for indicator in ['.m3u8', '/hls/', 'manifest', '.mpd']):
-                                vcodec = fmt.get('vcodec', 'none')
-                                acodec = fmt.get('acodec', 'none') 
-                                # Skip audio-only formats
-                                if vcodec == 'none' and acodec != 'none':
-                                    return False
-                                return fmt.get('url') is not None and vcodec != 'none'
-                        return False
-                    
-                    def is_hls_format(fmt):
-                        # HLS formats as fallback (m3u8 streams)
-                        if fmt.get('protocol') in ['m3u8', 'm3u8_native']:
-                            vcodec = fmt.get('vcodec', 'none')
-                            acodec = fmt.get('acodec', 'none')
-                            # Skip audio-only formats
-                            if vcodec == 'none' and acodec != 'none':
-                                return False
-                            return fmt.get('url') is not None and vcodec != 'none'
-                        return False
-                    
-                    # Try progressive formats first
-                    progressive_formats = [fmt for fmt in formats if is_progressive_format(fmt)]
-                    # Fallback to HLS formats if no progressive available
-                    hls_formats = [fmt for fmt in formats if is_hls_format(fmt)]
-                    
-                    # Use progressive if available, otherwise HLS
-                    valid_formats = progressive_formats if progressive_formats else hls_formats
-                    format_type_desc = "progressive" if progressive_formats else "HLS streaming"
-                    
-                    logging.info(f"Found {len(progressive_formats)} progressive and {len(hls_formats)} HLS formats")
-                    logging.info(f"Using {len(valid_formats)} {format_type_desc} formats")
-                    
-                    # Strategy 1: Find exact quality match with mp4
-                    if requested_quality != 'best':
-                        target_height = int(requested_quality.replace('p', '')) if requested_quality.endswith('p') else None
-                        if target_height:
-                            for fmt in valid_formats:
-                                if (fmt.get('ext') == 'mp4' and 
-                                    fmt.get('url') and 
-                                    fmt.get('height') == target_height):
-                                    direct_url = fmt['url']
-                                    found_format = fmt
-                                    logging.info(f"Found exact quality match: {requested_quality}")
-                                    break
-                    
-                    # Strategy 2: Any mp4 format from valid formats
-                    if not direct_url:
-                        mp4_formats = [fmt for fmt in valid_formats if fmt.get('ext') == 'mp4' and fmt.get('url')]
-                        if mp4_formats:
-                            # Prefer formats with higher height
-                            mp4_formats.sort(key=lambda x: x.get('height', 0), reverse=True)
-                            direct_url = mp4_formats[0]['url']
-                            found_format = mp4_formats[0]
-                            logging.info(f"Found MP4 format: {found_format.get('format_note', 'Unknown')}")
-                    
-                    # Strategy 3: Any valid format with URL (last resort)
-                    if not direct_url:
-                        if valid_formats:
-                            # Prefer mp4-like formats, then by file size/quality
-                            valid_formats.sort(key=lambda x: (
-                                x.get('ext') == 'mp4',
-                                x.get('height', 0),
-                                x.get('filesize', 0) or x.get('filesize_approx', 0) or 0
-                            ), reverse=True)
-                            direct_url = valid_formats[0]['url']
-                            found_format = valid_formats[0]
-                            logging.info(f"Using fallback format: {found_format.get('ext', 'unknown')} - {found_format.get('format_note', 'Unknown')}")
-                        else:
-                            logging.warning("No valid non-streaming formats found")
-                
-                if direct_url and found_format:
-                    # Check if this is an HLS/streaming format - browsers can't download these directly
-                    is_streaming = (found_format.get('protocol') in ['m3u8', 'm3u8_native', 'mpd'] or 
-                                  any(indicator in direct_url.lower() for indicator in ['.m3u8', '/hls/', 'manifest', '.mpd']))
-                    
-                    if is_streaming:
-                        logging.info(f"Found streaming format, requires server processing: {found_format.get('protocol', 'unknown')}")
-                        # Force server processing for streaming formats
-                        return jsonify({
-                            'success': True,
-                            'needs_processing': True,
-                            'title': title,
-                            'format': requested_format,
-                            'message': f'Streaming format detected - will process on server and convert to {requested_format.upper()}'
-                        })
-                    else:
-                        # Progressive download - browser can handle this directly
-                        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
-                        file_ext = found_format.get('ext', 'mp4') if found_format else 'mp4'
-                        filename = f"{safe_title}.{file_ext}"
-                        
-                        logging.info(f"Direct download ready: {filename}")
-                        
-                        return jsonify({
-                            'success': True,
-                            'direct_url': direct_url,
-                            'filename': filename,
-                            'title': title,
-                            'format': requested_format,
-                            'actual_format': found_format.get('format_note', 'Unknown') if found_format else 'Unknown',
-                            'resolution': f"{found_format.get('height', 'Unknown')}p" if found_format and found_format.get('height') else 'Unknown'
-                        })
-                else:
-                    logging.warning(f"No direct URL found for {video_url}, falling back to server processing")
-                    # Fallback to server-side download
-                    return jsonify({
-                        'success': True,
-                        'needs_processing': True,
-                        'title': title,
-                        'format': requested_format,
-                        'message': 'Direct download not available - will process on server'
-                    })
-            
-            # For MP3/WAV, we need server-side processing
-            else:
-                return jsonify({
-                    'success': True,
-                    'needs_processing': True,
-                    'title': title,
-                    'format': requested_format,
-                    'message': 'Audio conversion required - will process on server'
-                })
+            # Always use server processing for consistent downloads
+            # This ensures files are downloaded directly to user's device without redirects
+            return jsonify({
+                'success': True,
+                'needs_processing': True,
+                'title': title,
+                'format': format_type,
+                'message': f'{format_type.upper()} will be processed on server for direct download'
+            })
 
     except Exception as e:
-        logging.error(f"Error extracting download URL: {str(e)}")
+        logging.error(f"Error extracting video info: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/download', methods=['POST'])
