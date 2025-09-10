@@ -73,6 +73,18 @@ def get_download_url():
     base_opts = {
         'nocheckcertificate': True,
         'quiet': True,  # Reduce noise for URL extraction
+        # Use mweb client as recommended for current YouTube issues
+        'extractor_args': {
+            'youtube': {
+                'client': ['mweb'],
+                'lang': ['en'],
+                'region': ['US']
+            }
+        },
+        # Use a realistic user agent
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
     }
     if os.path.exists(cookies_path):
         logging.info("Using cookies.txt file for authentication.")
@@ -121,6 +133,18 @@ def download():
         'outtmpl': os.path.join(OUTPUT_DIR, '%(title)s.%(ext)s'),
         'progress_hooks': [progress_hook],
         'nocheckcertificate': True,
+        # Use mweb client as recommended for current YouTube issues
+        'extractor_args': {
+            'youtube': {
+                'client': ['mweb'],
+                'lang': ['en'],
+                'region': ['US']
+            }
+        },
+        # Use a realistic user agent
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
     }
     if os.path.exists(cookies_path):
         logging.info("Using cookies.txt file for authentication.")
